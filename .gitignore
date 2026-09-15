@@ -1,0 +1,66 @@
+# ========================
+# S*EntryTrace .gitignore
+# ========================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.sublime*
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Evidence & Reports (sensitive forensic data)
+evidence/
+reports/
+*.ab
+*.bugreport
+*.tar.gz
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/build/
+.next/
+
+# Platform Tools (downloaded binary)
+platform-tools/
+
+# Logs & Coverage
+*.log
+htmlcov/
+.coverage
+.coverage.*
+pytest.xml
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+
+# MVT data
+mvt-main/src/mvt.egg-info/
+
+# Original ZIP (large binary)
+mvt-main.zip
