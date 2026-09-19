@@ -1,3 +1,4 @@
 # S*EntryTrace Backend
-# This package will contain the FastAPI backend, device management,
-# and forensic orchestration layers.
+# Python backend for Android digital-forensics desktop workstation.
+# Wraps the MVT forensic engine and ADB device communication.
+__version__ = "0.1.0"
