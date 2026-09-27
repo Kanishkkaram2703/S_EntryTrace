@@ -35,6 +35,8 @@ def test_create_scan_directory(tmp_path, monkeypatch):
     assert (d / "artifacts").is_dir()
     assert (d / "findings").is_dir()
     assert (d / "hashes").is_dir()
+    assert (d / "logs").is_dir()
+    assert (d / "report").is_dir()
 
 
 def test_save_and_read_metadata(tmp_path):

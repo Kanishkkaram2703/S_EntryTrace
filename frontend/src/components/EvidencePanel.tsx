@@ -1,118 +1,201 @@
-import { api } from '../api/client';
+import { Archive, FileText, Hash, AlertTriangle, Info } from 'lucide-react';
+import type { Manifest, ScanState } from '../api/client';
 
 interface Props {
-  manifest: any;
+  manifest: Manifest | null;
   scanId: string | undefined;
+  scanState: ScanState | null;
 }
 
-export function EvidencePanel({ manifest, scanId }: Props) {
-  if (!scanId || !manifest) {
+function fmt(b: number): string {
+  if (b > 1048576) return `${(b / 1048576).toFixed(1)} MB`;
+  if (b > 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${b} B`;
+}
+
+export function EvidencePanel({ manifest, scanId, scanState }: Props) {
+  if (!scanId) {
     return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold">Evidence</h2>
-        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-8 text-center">
-          <p className="text-3xl mb-3">📁</p>
-          <p className="text-[var(--text-secondary)]">No evidence manifest available</p>
-          <p className="text-xs text-[var(--text-muted)] mt-2">Complete a scan to view collected evidence.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <h1>Evidence</h1>
+        <div className="card">
+          <div className="card-body" style={{ textAlign: 'center', padding: 48 }}>
+            <Archive size={40} color="var(--color-text-muted)" style={{ marginBottom: 12 }} />
+            <p style={{ fontWeight: 500 }}>No Examination Selected</p>
+            <p className="text-sm text-muted" style={{ marginTop: 8 }}>
+              Select an examination from the History tab to view its evidence.
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
-  const files: any[] = manifest.files || [];
-  const totalBytes = manifest.total_bytes || 0;
-  const fmt = (b: number) => b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : b > 1024 ? `${(b / 1024).toFixed(1)} KB` : `${b} B`;
+  if (!manifest) {
+    const isFailed = scanState?.status === 'failed';
+    const isRunning = scanState?.status === 'running';
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <h1>Evidence</h1>
+        <div className="card">
+          <div className="card-body" style={{ textAlign: 'center', padding: 48 }}>
+            <Archive size={40} color="var(--color-text-muted)" style={{ marginBottom: 12 }} />
+            <p style={{ fontWeight: 500 }}>No Evidence Collected</p>
+            <p className="text-sm text-muted" style={{ marginTop: 8 }}>
+              {isRunning
+                ? 'Evidence is being collected. The manifest will be available after the examination completes.'
+                : isFailed
+                ? 'The examination failed before evidence could be fully collected and catalogued.'
+                : 'Complete an examination to view evidence.'}
+            </p>
+            {isFailed && scanState?.warnings && scanState.warnings.length > 0 && (
+              <div style={{ marginTop: 16, textAlign: 'left' }}>
+                <p className="text-sm" style={{ fontWeight: 500, marginBottom: 8 }}>Collection issues:</p>
+                {scanState.warnings.map((w, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 4, fontSize: '0.8125rem', color: 'var(--color-warning)' }}>
+                    <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+                    <span>{w}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Evidence</h2>
-          <p className="text-xs text-[var(--text-muted)]">Scan: {scanId}</p>
-        </div>
-        <a href={api.getReportUrl(scanId)} target="_blank" rel="noreferrer"
-          className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors">
-          📄 Download Report
-        </a>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div>
+        <h1>Evidence Collection</h1>
+        <p className="text-sm text-muted" style={{ marginTop: 4 }}>
+          Integrity-verified forensic artifacts for {scanId}
+        </p>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-4 text-center">
-          <p className="text-2xl font-bold">{manifest.file_count}</p>
-          <p className="text-xs text-[var(--text-muted)]">Files</p>
+      {/* Summary stats */}
+      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: 'var(--color-info-bg)', color: 'var(--color-info)' }}>
+            <FileText />
+          </div>
+          <div>
+            <div className="stat-value">{manifest.file_count}</div>
+            <div className="stat-label">Evidence Files</div>
+          </div>
         </div>
-        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-4 text-center">
-          <p className="text-2xl font-bold">{fmt(totalBytes)}</p>
-          <p className="text-xs text-[var(--text-muted)]">Total Size</p>
-        </div>
-        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-4 text-center">
-          <p className="text-2xl font-bold text-emerald-400">✓</p>
-          <p className="text-xs text-[var(--text-muted)]">SHA-256 Verified</p>
-        </div>
-        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-4 text-center">
-          <p className="text-2xl font-bold">{manifest.collection_status || '—'}</p>
-          <p className="text-xs text-[var(--text-muted)]">Status</p>
-        </div>
-      </div>
 
-      {/* Metadata */}
-      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-5 space-y-2">
-        <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Collection Metadata</h3>
-        <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
-          <div className="flex justify-between"><span className="text-[var(--text-muted)]">MVT</span><span>{manifest.mvt_version || '—'}</span></div>
-          <div className="flex justify-between"><span className="text-[var(--text-muted)]">ADB</span><span>{manifest.adb_version || '—'}</span></div>
-          <div className="flex justify-between"><span className="text-[var(--text-muted)]">Profile</span><span>{manifest.scan_profile || '—'}</span></div>
-          <div className="flex justify-between"><span className="text-[var(--text-muted)]">Start</span><span className="text-xs">{manifest.collection_start || '—'}</span></div>
-          <div className="flex justify-between"><span className="text-[var(--text-muted)]">End</span><span className="text-xs">{manifest.collection_end || '—'}</span></div>
-          <div className="flex justify-between"><span className="text-[var(--text-muted)]">Generated</span><span className="text-xs">{manifest.generated_at || '—'}</span></div>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
+            <Archive />
+          </div>
+          <div>
+            <div className="stat-value">{fmt(manifest.total_bytes)}</div>
+            <div className="stat-label">Total Size</div>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: '#f3f4f6', color: '#6b7280' }}>
+            <Hash />
+          </div>
+          <div>
+            <div className="stat-value">SHA-256</div>
+            <div className="stat-label">Hash Algorithm</div>
+          </div>
         </div>
       </div>
 
-      {/* Limitations */}
-      {manifest.limitations && manifest.limitations.length > 0 && (
-        <div className="bg-amber-900/20 border border-amber-800 rounded-lg p-4">
-          <p className="text-xs font-semibold text-amber-400 mb-2">Collection Limitations</p>
-          {manifest.limitations.map((l: string, i: number) => (
-            <p key={i} className="text-xs text-amber-300">• {l}</p>
-          ))}
+      {/* Collection Info */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title"><Info size={18} /> Collection Information</div>
         </div>
-      )}
+        <div className="card-body">
+          <div className="kv-grid">
+            <span className="kv-label">Scan ID</span>
+            <span className="kv-value text-mono text-sm">{manifest.scan_id}</span>
+            <span className="kv-label">Profile</span>
+            <span className="kv-value">{manifest.scan_profile || 'Rapid Triage'}</span>
+            <span className="kv-label">MVT Version</span>
+            <span className="kv-value">{manifest.mvt_version || 'N/A'}</span>
+            <span className="kv-label">ADB Version</span>
+            <span className="kv-value">{manifest.adb_version || 'N/A'}</span>
+            <span className="kv-label">Collection Start</span>
+            <span className="kv-value text-sm">{manifest.collection_start ? new Date(manifest.collection_start).toLocaleString() : 'N/A'}</span>
+            <span className="kv-label">Collection End</span>
+            <span className="kv-value text-sm">{manifest.collection_end ? new Date(manifest.collection_end).toLocaleString() : 'N/A'}</span>
+            <span className="kv-label">Manifest Generated</span>
+            <span className="kv-value text-sm">{manifest.generated_at ? new Date(manifest.generated_at).toLocaleString() : 'N/A'}</span>
+          </div>
+        </div>
+      </div>
 
-      {/* File list */}
-      {files.length > 0 && (
-        <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-5">
-          <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">
-            Evidence Files ({files.length})
-          </h3>
-          <div className="max-h-80 overflow-y-auto space-y-1">
-            {files.slice(0, 100).map((f: any, i: number) => (
-              <div key={i} className="flex items-center justify-between py-1.5 border-b border-[var(--border-color)] last:border-0 text-xs">
-                <span className="text-[var(--text-primary)] truncate max-w-[50%]" title={f.relative_path}>{f.relative_path}</span>
-                <div className="flex items-center gap-4">
-                  <span className="text-[var(--text-muted)]">{fmt(f.size_bytes)}</span>
-                  <span className="font-mono text-[var(--text-muted)] w-32 truncate" title={f.sha256}>{f.sha256?.substring(0, 16)}…</span>
-                </div>
+      {/* Warnings */}
+      {manifest.warnings && manifest.warnings.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title"><AlertTriangle size={18} /> Collection Warnings</div>
+          </div>
+          <div className="card-body">
+            {manifest.warnings.map((w, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 6, fontSize: '0.8125rem', color: 'var(--color-warning)' }}>
+                <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+                <span>{w}</span>
               </div>
             ))}
-            {files.length > 100 && <p className="text-xs text-[var(--text-muted)] pt-2">...and {files.length - 100} more files</p>}
           </div>
         </div>
       )}
 
-      {/* Warnings/Errors */}
-      {manifest.warnings && manifest.warnings.length > 0 && (
-        <div className="bg-amber-900/20 border border-amber-800 rounded-lg p-4">
-          <p className="text-xs font-semibold text-amber-400 mb-1">Warnings</p>
-          {manifest.warnings.map((w: string, i: number) => <p key={i} className="text-xs text-amber-300">{w}</p>)}
+      {/* Limitations */}
+      {manifest.limitations && manifest.limitations.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title"><Info size={18} /> Limitations</div>
+          </div>
+          <div className="card-body">
+            {manifest.limitations.map((l, i) => (
+              <div key={i} style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)', marginBottom: 4, paddingLeft: 12, borderLeft: '2px solid var(--color-border)' }}>
+                {l}
+              </div>
+            ))}
+          </div>
         </div>
       )}
-      {manifest.errors && manifest.errors.length > 0 && (
-        <div className="bg-red-900/20 border border-red-700 rounded-lg p-4">
-          <p className="text-xs font-semibold text-red-400 mb-1">Errors</p>
-          {manifest.errors.map((e: string, i: number) => <p key={i} className="text-xs text-red-300">{e}</p>)}
+
+      {/* File Inventory */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title"><Hash size={18} /> Evidence File Inventory</div>
         </div>
-      )}
+        <div className="card-body" style={{ padding: '12px 16px', overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--color-border)' }}>
+                <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 600, color: 'var(--color-text-muted)' }}>File</th>
+                <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 600, color: 'var(--color-text-muted)' }}>Size</th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 600, color: 'var(--color-text-muted)' }}>SHA-256</th>
+              </tr>
+            </thead>
+            <tbody>
+              {manifest.files.slice(0, 50).map((f, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
+                  <td style={{ padding: '5px 8px' }} className="text-mono">{f.relative_path}</td>
+                  <td style={{ padding: '5px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{fmt(f.size_bytes)}</td>
+                  <td style={{ padding: '5px 8px' }} className="text-mono">{f.sha256?.slice(0, 16)}...</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {manifest.files.length > 50 && (
+            <p className="text-xs text-muted" style={{ marginTop: 8 }}>
+              Showing 50 of {manifest.files.length} files.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

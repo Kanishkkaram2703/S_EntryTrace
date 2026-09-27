@@ -1,18 +1,32 @@
 /**
  * S*EntryTrace — API Client
- * Connects frontend to the FastAPI backend.
- * Never fabricates responses — reports actual errors.
+ * Typed interface to the FastAPI backend.
  */
 
-const BASE = '';  // Proxied through Vite dev server
+const BASE = '/api';
 
-export interface HealthData {
-  app_name: string;
-  app_version: string;
-  environment: string;
+async function get<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`);
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  return res.json();
+}
+
+async function post<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  return res.json();
+}
+
+// ── Types ─────────────────────────────────────────────
+
+export interface HealthResponse {
   status: string;
   mvt: { available: boolean; version: string | null; module_count: number };
-  adb: { available: boolean; version: string | null };
+  adb: { available: boolean; version: string | null; adb_path: string | null };
 }
 
 export interface DeviceInfo {
@@ -27,18 +41,92 @@ export interface DeviceInfo {
   is_rooted: boolean | null;
   adb_version: string | null;
   detected_at: string;
+  last_verified_at: string | null;
+  metadata_state: string;
 }
 
-export interface ScanInfo {
+export interface DeviceListResponse {
+  count: number;
+  devices: DeviceInfo[];
+}
+
+export interface ScanStage {
+  stage_id: string;
+  display_name: string;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_seconds: number | null;
+  summary: string;
+  error: string | null;
+  records_processed: number;
+}
+
+export interface TimelineEntry {
+  time: string;
+  timestamp: string;
+  level: 'INFO' | 'SUCCESS' | 'WARN' | 'ERROR';
+  message: string;
+}
+
+export interface ScanState {
+  scan_id: string;
+  device_serial: string;
+  device: Record<string, unknown>;
+  scan_profile: string;
+  status: string;
+  started_at: string;
+  completed_at: string | null;
+  mvt_version: string | null;
+  adb_version: string | null;
+  current_operation: string;
+  log: string;
+  timeline: TimelineEntry[];
+  warnings: string[];
+  errors: string[];
+  findings_count: number;
+  stages: ScanStage[];
+}
+
+export interface ScanListItem {
   scan_id: string;
   status: string;
   device_serial: string;
-  current_operation?: string;
-  started_at?: string;
-  completed_at?: string;
-  warnings?: string[];
-  errors?: string[];
-  findings_count?: number;
+  device_model: string | null;
+  device_manufacturer: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  findings_count: number;
+  has_manifest: boolean;
+  has_report: boolean;
+}
+
+export interface Finding {
+  finding_id: string;
+  scan_id: string;
+  category: string;
+  title: string;
+  description: string;
+  severity: string;
+  confidence: string;
+  source_module: string;
+  evidence_path: string | null;
+  mvt_level: string | null;
+  mvt_message: string | null;
+  event_time: string | null;
+  event_data: Record<string, unknown> | null;
+  explanation: string;
+  why_it_matters: string;
+  interpretation: string;
+}
+
+export interface AnalysisModule {
+  module_name: string;
+  display_name: string;
+  records_processed: number;
+  alerts_generated: number;
+  status: string;
+  summary: string;
 }
 
 export interface FindingSummary {
@@ -46,50 +134,52 @@ export interface FindingSummary {
   total: number;
   by_category: Record<string, number>;
   by_severity: Record<string, number>;
-  findings: Array<{
-    finding_id: string;
-    category: string;
-    title: string;
-    description: string;
-    severity: string;
-    confidence: string;
-    source_module: string;
-  }>;
+  findings: Finding[];
+  modules_analyzed: AnalysisModule[];
+  ioc_configured: boolean;
+  ioc_indicators_loaded: number;
+  total_records_processed: number;
 }
 
-async function apiFetch<T>(url: string, opts?: RequestInit): Promise<T> {
-  try {
-    const res = await fetch(`${BASE}${url}`, opts);
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: res.statusText }));
-      throw new Error(err.detail || err.error || `HTTP ${res.status}`);
-    }
-    return res.json();
-  } catch (e: any) {
-    if (e.message?.includes('Failed to fetch') || e.message?.includes('NetworkError')) {
-      throw new Error('Backend unavailable. Ensure the backend server is running on port 8000.');
-    }
-    throw e;
-  }
+export interface EvidenceFile {
+  relative_path: string;
+  size_bytes: number;
+  sha256: string;
 }
+
+export interface Manifest {
+  scan_id: string;
+  file_count: number;
+  total_bytes: number;
+  files: EvidenceFile[];
+  collection_status: string;
+  mvt_version: string;
+  adb_version: string;
+  scan_profile: string;
+  collection_start: string;
+  collection_end: string;
+  generated_at: string;
+  warnings: string[];
+  errors: string[];
+  limitations: string[];
+}
+
+// ── API ───────────────────────────────────────────────
 
 export const api = {
-  health: () => apiFetch<HealthData>('/health'),
-  engineStatus: () => apiFetch<any>('/api/engine/status'),
-  listDevices: () => apiFetch<{ count: number; devices: DeviceInfo[] }>('/api/devices'),
-  getDevice: (serial: string) => apiFetch<DeviceInfo>(`/api/devices/${encodeURIComponent(serial)}`),
-  startScan: (serial: string) =>
-    apiFetch<{ scan_id: string; status: string }>('/api/scans', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ device_serial: serial, scan_profile: 'rapid_triage' }),
-    }),
-  listScans: () => apiFetch<{ count: number; scans: ScanInfo[] }>('/api/scans'),
-  getScan: (id: string) => apiFetch<ScanInfo>(`/api/scans/${id}`),
-  getScanLogs: (id: string) => apiFetch<{ scan_id: string; logs: string }>(`/api/scans/${id}/logs`),
-  getScanFindings: (id: string) => apiFetch<FindingSummary>(`/api/scans/${id}/findings`),
-  getScanManifest: (id: string) => apiFetch<any>(`/api/scans/${id}/manifest`),
-  cancelScan: (id: string) =>
-    apiFetch<any>(`/api/scans/${id}/cancel`, { method: 'POST' }),
-  getReportUrl: (id: string) => `${BASE}/api/reports/${id}`,
+  health: () => get<HealthResponse>('/health'),
+  listDevices: () => get<DeviceListResponse>('/devices'),
+  getDevice: (serial: string) => get<DeviceInfo>(`/devices/${serial}`),
+  startScan: (serial: string) => post<{ scan_id: string; status: string }>('/scans', { device_serial: serial }),
+  listScans: () => get<{ count: number; scans: ScanListItem[] }>('/scans'),
+  getScan: (id: string) => get<ScanState>(`/scans/${id}`),
+  getScanLogs: (id: string) => get<{ logs: string }>(`/scans/${id}/logs`),
+  getTimeline: (id: string) => get<{ scan_id: string; timeline: TimelineEntry[] }>(`/scans/${id}/timeline`),
+  getManifest: (id: string) => get<Manifest>(`/scans/${id}/manifest`),
+  getFindings: (id: string) => get<FindingSummary>(`/scans/${id}/findings`),
+  cancelScan: (id: string) => post<{ message: string }>(`/scans/${id}/cancel`),
+  getReportUrl: (id: string) => `${BASE}/reports/${id}`,
+  getReportPdfUrl: (id: string) => `${BASE}/reports/${id}/pdf`,
+  getReportStatus: (id: string) => get<{ scan_id: string; exists: boolean; status: string; size_bytes: number }>(`/reports/${id}/status`),
+  generateReport: (id: string) => post<{ scan_id: string; status: string; size_bytes: number }>(`/reports/${id}/generate`),
 };

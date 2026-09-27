@@ -1,7 +1,9 @@
 {
-  "name": "frontend",
+  "name": "s-entrytrace-frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "S*EntryTrace — Android Digital Forensics Workstation Frontend",
+  "author": "Kanishk Karam",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,6 +19,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "lucide-react": "^1.47.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tailwindcss": "^4.3.3"

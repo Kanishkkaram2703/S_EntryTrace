@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 class FindingCategory(str, Enum):
     """Honest finding categories — no exaggerated claims."""
     IOC_MATCH = "Confirmed IOC Match"
-    SUSPICIOUS = "Suspicious Heuristic"
+    SUSPICIOUS = "Suspicious Observation"
     INFORMATIONAL = "Informational"
     NOT_ASSESSED = "Not Assessed"
     COLLECTION_WARNING = "Collection Warning"
@@ -47,6 +47,27 @@ class Finding(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     status: str = "new"
 
+    # MVT-specific fields
+    mvt_level: Optional[str] = None  # MEDIUM, HIGH, CRITICAL etc.
+    mvt_message: Optional[str] = None
+    event_time: Optional[str] = None
+    event_data: Optional[dict[str, Any]] = None
+
+    # Human-readable explanation
+    explanation: str = ""
+    why_it_matters: str = ""
+    interpretation: str = ""
+
+
+class AnalysisModule(BaseModel):
+    """Summary of what a single MVT module analyzed."""
+    module_name: str
+    display_name: str
+    records_processed: int = 0
+    alerts_generated: int = 0
+    status: str = "completed"
+    summary: str = ""
+
 
 class FindingSummary(BaseModel):
     """Aggregated findings overview for a scan."""
@@ -55,3 +76,7 @@ class FindingSummary(BaseModel):
     by_category: dict[str, int] = Field(default_factory=dict)
     by_severity: dict[str, int] = Field(default_factory=dict)
     findings: list[Finding] = Field(default_factory=list)
+    modules_analyzed: list[AnalysisModule] = Field(default_factory=list)
+    ioc_configured: bool = False
+    ioc_indicators_loaded: int = 0
+    total_records_processed: int = 0

@@ -1,100 +1,150 @@
+import { Smartphone, RefreshCw, Clock, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import type { DeviceInfo } from '../api/client';
-
-function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div className="flex justify-between items-center py-2 border-b border-[var(--border-color)] last:border-0">
-      <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">{label}</span>
-      <span className="text-sm text-[var(--text-primary)]">{value ?? 'Unknown'}</span>
-    </div>
-  );
-}
 
 interface Props {
   device: DeviceInfo | null;
   devices: DeviceInfo[];
   onSelect: (d: DeviceInfo) => void;
-  onStartScan: () => void;
+  onRefresh: () => void;
 }
 
-export function DevicePanel({ device, devices, onSelect, onStartScan }: Props) {
-  if (!device) {
+export function DevicePanel({ device, devices, onSelect, onRefresh }: Props) {
+  if (!device && devices.length === 0) {
     return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold">Device Information</h2>
-        {devices.length === 0 ? (
-          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-8 text-center">
-            <p className="text-3xl mb-3">📱</p>
-            <p className="text-lg text-[var(--text-secondary)]">No Android device connected</p>
-            <p className="text-xs text-[var(--text-muted)] mt-2 max-w-md mx-auto">
-              Connect an Android device via USB cable. Ensure USB Debugging is enabled in Developer Options, then authorize the connection when prompted on the device screen.
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <h1>Device</h1>
+        <div className="card">
+          <div className="card-body" style={{ textAlign: 'center', padding: 48 }}>
+            <Smartphone size={40} color="var(--color-text-muted)" style={{ marginBottom: 12 }} />
+            <p style={{ fontSize: '1rem', fontWeight: 500 }}>No Device Connected</p>
+            <p className="text-sm text-muted" style={{ marginTop: 8, maxWidth: 400, margin: '8px auto' }}>
+              Connect an Android device with USB debugging enabled to begin.
             </p>
           </div>
-        ) : (
-          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-5">
-            <h3 className="text-sm font-semibold text-[var(--text-secondary)] mb-3">Select a device</h3>
-            {devices.map(d => (
-              <button key={d.serial} onClick={() => onSelect(d)}
-                className="w-full p-3 mb-2 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--bg-card-hover)] transition-colors text-left">
-                <span className="text-sm">{d.model || d.serial}</span>
-                <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
-                  d.state === 'connected' ? 'bg-emerald-500/15 text-emerald-400' :
-                  d.state === 'unauthorized' ? 'bg-amber-500/15 text-amber-400' :
-                  'bg-red-500/15 text-red-400'}`}>{d.state}</span>
-              </button>
-            ))}
-          </div>
-        )}
+        </div>
       </div>
     );
   }
 
-  const stateColor = device.state === 'connected' ? 'text-emerald-400' :
-    device.state === 'unauthorized' ? 'text-amber-400' : 'text-red-400';
+  const d = device || devices[0];
+  const metaState = d.metadata_state || 'unavailable';
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 className="text-2xl font-bold">{device.model || 'Android Device'}</h2>
-          <p className="text-sm text-[var(--text-muted)]">{device.manufacturer || ''} · {device.serial}</p>
+          <h1>Device Profile</h1>
+          <p className="text-sm text-muted" style={{ marginTop: 4 }}>
+            {d.manufacturer} {d.model} · {d.serial}
+          </p>
         </div>
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${stateColor} ${
-          device.state === 'connected' ? 'bg-emerald-500/15' :
-          device.state === 'unauthorized' ? 'bg-amber-500/15' : 'bg-red-500/15'}`}>{device.state}</span>
-      </div>
-
-      {device.state === 'unauthorized' && (
-        <div className="bg-amber-900/30 border border-amber-700 rounded-lg p-4 text-sm text-amber-300">
-          ⚠ This device has not authorized USB debugging. Please check the device screen and tap "Allow USB debugging."
-        </div>
-      )}
-
-      {device.state === 'offline' && (
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm text-red-300">
-          ⚠ This device is offline. Try reconnecting the USB cable or restarting the ADB server.
-        </div>
-      )}
-
-      <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-5">
-        <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Device Metadata</h3>
-        <InfoRow label="Serial" value={device.serial} />
-        <InfoRow label="Model" value={device.model} />
-        <InfoRow label="Manufacturer" value={device.manufacturer} />
-        <InfoRow label="Android Version" value={device.android_version} />
-        <InfoRow label="SDK / API Level" value={device.sdk_level} />
-        <InfoRow label="Security Patch" value={device.security_patch} />
-        <InfoRow label="Build Fingerprint" value={device.build_fingerprint} />
-        <InfoRow label="Root Status" value={device.is_rooted === null ? 'Unknown' : device.is_rooted ? 'Rooted' : 'Not Rooted'} />
-        <InfoRow label="ADB Version" value={device.adb_version} />
-        <InfoRow label="Detected At" value={device.detected_at} />
-      </div>
-
-      {device.state === 'connected' && (
-        <button onClick={onStartScan}
-          className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white font-semibold text-sm transition-all shadow-lg shadow-cyan-500/20">
-          🔍 Start Rapid Triage Scan
+        <button className="btn btn-outline" onClick={onRefresh}>
+          <RefreshCw size={14} /> Refresh
         </button>
+      </div>
+
+      {/* Multiple device selector */}
+      {devices.length > 1 && (
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Connected Devices ({devices.length})</div>
+          </div>
+          <div className="card-body" style={{ display: 'flex', gap: 8 }}>
+            {devices.map(dev => (
+              <button
+                key={dev.serial}
+                className={`btn ${dev.serial === d.serial ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => onSelect(dev)}
+              >
+                {dev.model || dev.serial}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
+
+      {/* Metadata state indicator */}
+      {metaState === 'stale' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--color-warning-bg)', borderRadius: 'var(--radius)', fontSize: '0.8125rem', color: 'var(--color-warning)' }}>
+          <Clock size={14} />
+          <span>Device information may be stale. Some properties could not be refreshed.</span>
+        </div>
+      )}
+      {metaState === 'error' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--color-error-bg)', borderRadius: 'var(--radius)', fontSize: '0.8125rem', color: 'var(--color-error)' }}>
+          <AlertCircle size={14} />
+          <span>Unable to read device properties. Showing last verified values.</span>
+        </div>
+      )}
+
+      {/* Device Info */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title"><Smartphone size={18} /> Device Information</div>
+          <span className={`badge ${d.state === 'connected' ? 'badge-success' : d.state === 'unauthorized' ? 'badge-warning' : 'badge-error'}`}>
+            {d.state}
+          </span>
+        </div>
+        <div className="card-body">
+          <div className="kv-grid">
+            <span className="kv-label">Model</span>
+            <span className="kv-value">{d.model || 'Not available'}</span>
+            <span className="kv-label">Manufacturer</span>
+            <span className="kv-value">{d.manufacturer || 'Not available'}</span>
+            <span className="kv-label">Android Version</span>
+            <span className="kv-value">{d.android_version || 'Not available'}</span>
+            <span className="kv-label">SDK / API Level</span>
+            <span className="kv-value">{d.sdk_level || 'Not available'}</span>
+            <span className="kv-label">Security Patch</span>
+            <span className="kv-value">{d.security_patch || 'Not available'}</span>
+            <span className="kv-label">Build Fingerprint</span>
+            <span className="kv-value text-mono text-xs">{d.build_fingerprint || 'Not available'}</span>
+            <span className="kv-label">Serial Number</span>
+            <span className="kv-value text-mono text-sm">{d.serial}</span>
+            <span className="kv-label">Root Status</span>
+            <span className="kv-value">{d.is_rooted === true ? 'Rooted' : d.is_rooted === false ? 'Not rooted' : 'Unknown'}</span>
+            <span className="kv-label">Connection</span>
+            <span className="kv-value">{d.state}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Verification info */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title"><Info size={18} /> Verification</div>
+        </div>
+        <div className="card-body">
+          <div className="kv-grid">
+            <span className="kv-label">Metadata State</span>
+            <span className="kv-value">
+              <span className={`badge ${metaState === 'verified' ? 'badge-success' : metaState === 'stale' ? 'badge-warning' : 'badge-neutral'}`}>
+                {metaState}
+              </span>
+            </span>
+            <span className="kv-label">Last Verified</span>
+            <span className="kv-value text-sm">
+              {d.last_verified_at ? new Date(d.last_verified_at).toLocaleString() : 'Not yet verified'}
+            </span>
+            <span className="kv-label">First Detected</span>
+            <span className="kv-value text-sm">{new Date(d.detected_at).toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Technical Details */}
+      <details className="card">
+        <summary className="expandable-header" style={{ listStyle: 'none' }}>
+          <span className="card-title" style={{ fontSize: '0.875rem' }}>Technical Details</span>
+          <span className="text-xs text-muted">Click to expand</span>
+        </summary>
+        <div className="expandable-content">
+          <div className="kv-grid">
+            <span className="kv-label">ADB Version</span>
+            <span className="kv-value text-mono text-sm">{d.adb_version || 'N/A'}</span>
+          </div>
+        </div>
+      </details>
     </div>
   );
 }

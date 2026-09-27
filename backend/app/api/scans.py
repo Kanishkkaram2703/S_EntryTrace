@@ -27,14 +27,14 @@ def start_scan(req: StartScanRequest):
 
 @router.get("")
 def list_scans():
-    """List all scans."""
+    """List all scans with enriched metadata."""
     scans = _scan_svc.list_scans()
     return {"count": len(scans), "scans": scans}
 
 
 @router.get("/{scan_id}")
 def get_scan(scan_id: str):
-    """Get scan status and details."""
+    """Get scan status and details (checks memory then disk)."""
     scan = _scan_svc.get_scan(scan_id)
     if not scan:
         raise HTTPException(404, f"Scan '{scan_id}' not found")
@@ -47,6 +47,13 @@ def get_scan_logs(scan_id: str):
     """Get scan log output."""
     logs = _scan_svc.get_scan_logs(scan_id)
     return {"scan_id": scan_id, "logs": logs}
+
+
+@router.get("/{scan_id}/timeline")
+def get_scan_timeline(scan_id: str):
+    """Get structured activity timeline for an examination."""
+    timeline = _scan_svc.get_timeline(scan_id)
+    return {"scan_id": scan_id, "timeline": timeline}
 
 
 @router.get("/{scan_id}/manifest")

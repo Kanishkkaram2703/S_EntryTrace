@@ -20,12 +20,21 @@ class DeviceState(str, Enum):
     ERROR = "error"
 
 
+class MetadataState(str, Enum):
+    """State of device metadata freshness."""
+    VERIFIED = "verified"
+    STALE = "stale"
+    UNAVAILABLE = "unavailable"
+    ERROR = "error"
+
+
 class DeviceInfo(BaseModel):
     """Metadata for a single Android device.
 
-    Fields use ``None`` to represent values that could not be read.
-    ``is_rooted`` defaults to ``None`` (unknown) and is only set to
-    ``True`` when positively verified.
+    Fields use ``None`` to represent values that were never collected.
+    Previously valid values are preserved via the metadata cache in
+    DeviceManager — they are never overwritten with None due to
+    temporary ADB failures.
     """
 
     serial: str = Field(..., description="ADB device serial number")
@@ -42,12 +51,19 @@ class DeviceInfo(BaseModel):
     )
     is_rooted: Optional[bool] = Field(
         None,
-        description="Root status: True = confirmed rooted, False = confirmed not rooted, None = unknown",
+        description="Root status: True = confirmed rooted, False = not rooted, None = unknown",
     )
     adb_version: Optional[str] = Field(None, description="ADB server version")
     detected_at: datetime = Field(
         default_factory=datetime.utcnow,
-        description="Timestamp when this info was collected",
+        description="Timestamp when this device was first detected",
+    )
+    last_verified_at: Optional[datetime] = Field(
+        None, description="Timestamp when metadata was last successfully verified"
+    )
+    metadata_state: MetadataState = Field(
+        MetadataState.UNAVAILABLE,
+        description="Freshness state of device metadata"
     )
 
     model_config = {"json_schema_extra": {"example": {
@@ -62,4 +78,6 @@ class DeviceInfo(BaseModel):
         "is_rooted": None,
         "adb_version": "37.0.1",
         "detected_at": "2026-09-15T12:00:00",
+        "last_verified_at": "2026-09-15T12:00:00",
+        "metadata_state": "verified",
     }}}

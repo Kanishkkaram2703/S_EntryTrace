@@ -2,15 +2,35 @@
 
 High-level service that orchestrates ADB device discovery and metadata
 collection.  Delegates all ADB I/O to :class:`AdbClient`.
+
+KEY DESIGN: Never overwrites a valid cached value with None on a
+temporary ADB failure. Maintains a 'last verified' metadata cache.
 """
 
 import logging
+from datetime import datetime
 from typing import Optional
 
-from backend.app.models.device import DeviceInfo, DeviceState
+from backend.app.models.device import DeviceInfo, DeviceState, MetadataState
 from backend.app.services.adb_client import AdbClient, AdbError
 
 log = logging.getLogger("ste.device_manager")
+
+# Properties that can be read from the device
+_PROPERTY_MAP = {
+    "model": "getprop ro.product.model",
+    "manufacturer": "getprop ro.product.manufacturer",
+    "android_version": "getprop ro.build.version.release",
+    "sdk_level": "getprop ro.build.version.sdk",
+    "security_patch": "getprop ro.build.version.security_patch",
+    "build_fingerprint": "getprop ro.build.fingerprint",
+}
+
+
+# Module-level singleton metadata cache shared across all DeviceManager instances.
+# This ensures that device metadata cached by one API route (e.g. /api/devices)
+# is available to another (e.g. scan_service) without re-querying ADB.
+_shared_metadata_cache: dict[str, DeviceInfo] = {}
 
 
 class DeviceManager:
@@ -24,7 +44,8 @@ class DeviceManager:
 
     def __init__(self, adb_client: Optional[AdbClient] = None) -> None:
         self._adb = adb_client or AdbClient()
-        self._devices_cache: list[DeviceInfo] = []
+        # Use module-level shared cache so all instances see same metadata
+        self._metadata_cache = _shared_metadata_cache
 
     # ── Public API ─────────────────────────────────────────────────────
 
@@ -48,10 +69,11 @@ class DeviceManager:
         }
 
     def list_devices(self) -> list[DeviceInfo]:
-        """Discover all ADB-visible devices and return their basic info.
+        """Discover all ADB-visible devices and return their metadata.
 
-        Returns an empty list when ADB is unavailable or no devices are
-        attached — never raises unhandled exceptions.
+        Merges freshly discovered state with cached metadata so that
+        previously verified properties are preserved even when ADB
+        temporarily cannot read them.
         """
         if not self._adb.is_available():
             log.warning("ADB not available — returning empty device list")
@@ -70,25 +92,36 @@ class DeviceManager:
             adb_state = raw.get("state", "")
             state = self._map_state(adb_state)
 
-            info = DeviceInfo(
-                serial=serial,
-                state=state,
-                model=raw.get("model"),
-            )
+            # Start from cache if available
+            cached = self._metadata_cache.get(serial)
+            if cached:
+                info = cached.model_copy()
+                info.state = state
+            else:
+                info = DeviceInfo(serial=serial, state=state, model=raw.get("model"))
 
-            # Attempt to read ADB version once
+            # Try to enrich with full properties if connected
+            if state == DeviceState.CONNECTED:
+                self._enrich_metadata(info)
+
+            # Set ADB version
             try:
                 info.adb_version = self._adb.get_version()
             except AdbError:
                 pass
 
+            # Update cache
+            self._metadata_cache[serial] = info
             devices.append(info)
 
-        self._devices_cache = devices
         return devices
 
-    def get_device_info(self, serial: str) -> DeviceInfo:
+    def get_device_info(self, serial: str) -> "DeviceInfo":
         """Collect detailed metadata for a specific device.
+
+        Uses cached values as a baseline and only updates fields that
+        can be successfully read. Never overwrites a valid value with
+        None due to a temporary failure.
 
         Raises ``DeviceNotFoundError`` when the serial is not visible.
         """
@@ -106,6 +139,13 @@ class DeviceManager:
                 break
 
         if match is None:
+            # Device not visible — return stale cache if available
+            cached = self._metadata_cache.get(serial)
+            if cached:
+                stale = cached.model_copy()
+                stale.state = DeviceState.UNAVAILABLE
+                stale.metadata_state = MetadataState.STALE
+                return stale
             raise DeviceNotFoundError(
                 f"Device '{serial}' not found in ADB device list."
             )
@@ -113,32 +153,28 @@ class DeviceManager:
         adb_state = match.get("state", "")
         state = self._map_state(adb_state)
 
-        info = DeviceInfo(serial=serial, state=state)
+        # Start from cache if available
+        cached = self._metadata_cache.get(serial)
+        if cached:
+            info = cached.model_copy()
+            info.state = state
+        else:
+            info = DeviceInfo(serial=serial, state=state)
 
         # Only read properties from fully connected devices
         if state == DeviceState.CONNECTED:
-            info.model = self._prop(serial, "getprop ro.product.model")
-            info.manufacturer = self._prop(serial, "getprop ro.product.manufacturer")
-            info.android_version = self._prop(
-                serial, "getprop ro.build.version.release"
-            )
-            info.sdk_level = self._prop(serial, "getprop ro.build.version.sdk")
-            info.security_patch = self._prop(
-                serial, "getprop ro.build.version.security_patch"
-            )
-            info.build_fingerprint = self._prop(
-                serial, "getprop ro.build.fingerprint"
-            )
-            info.is_rooted = self._check_root(serial)
+            self._enrich_metadata(info)
 
         try:
             info.adb_version = self._adb.get_version()
         except AdbError:
             pass
 
+        # Update cache
+        self._metadata_cache[serial] = info
         return info
 
-    def get_connected_device(self) -> DeviceInfo:
+    def get_connected_device(self) -> "DeviceInfo":
         """Return the single connected device, or raise an error.
 
         Raises ``DeviceNotFoundError`` if zero or multiple devices.
@@ -176,11 +212,40 @@ class DeviceManager:
         return connected[0]
 
     def refresh_devices(self) -> list[DeviceInfo]:
-        """Force-refresh the device list (clears cache)."""
-        self._devices_cache.clear()
+        """Force-refresh the device list (cache is preserved for merge)."""
         return self.list_devices()
 
     # ── Internal helpers ───────────────────────────────────────────────
+
+    def _enrich_metadata(self, info: DeviceInfo) -> None:
+        """Read device properties and merge into info, preserving cached values.
+
+        Only overwrites a field if the new value is non-null.
+        """
+        success_count = 0
+        total = len(_PROPERTY_MAP)
+
+        for field_name, prop_cmd in _PROPERTY_MAP.items():
+            new_value = self._prop(info.serial, prop_cmd)
+            if new_value is not None:
+                setattr(info, field_name, new_value)
+                success_count += 1
+            # If new_value is None, we keep whatever was already set (cached)
+
+        # Check root status
+        root_val = self._check_root(info.serial)
+        if root_val is not None:
+            info.is_rooted = root_val
+
+        # Set metadata freshness
+        if success_count == total:
+            info.metadata_state = MetadataState.VERIFIED
+            info.last_verified_at = datetime.utcnow()
+        elif success_count > 0:
+            info.metadata_state = MetadataState.STALE
+            # partial success — keep last_verified_at from before
+        else:
+            info.metadata_state = MetadataState.ERROR
 
     @staticmethod
     def _map_state(adb_state: str) -> DeviceState:

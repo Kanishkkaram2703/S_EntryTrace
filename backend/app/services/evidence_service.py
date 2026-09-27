@@ -25,7 +25,7 @@ class EvidenceService:
     def create_scan_directory(self, scan_id: str) -> Path:
         """Create the evidence directory structure for a scan."""
         scan_dir = self._base / scan_id
-        for sub in ("artifacts", "findings", "hashes"):
+        for sub in ("artifacts", "findings", "hashes", "logs", "report"):
             (scan_dir / sub).mkdir(parents=True, exist_ok=True)
         return scan_dir
 
@@ -34,29 +34,91 @@ class EvidenceService:
         d = self._base / scan_id
         return d if d.is_dir() else None
 
+    # ── Metadata persistence ──────────────────────────────────────────
+
     def save_metadata(self, scan_id: str, metadata: dict) -> Path:
         """Save scan metadata JSON."""
         scan_dir = self._base / scan_id
         scan_dir.mkdir(parents=True, exist_ok=True)
         path = scan_dir / "metadata.json"
-        path.write_text(json.dumps(metadata, indent=2, default=str), encoding="utf-8")
+        # Remove internal fields before persisting
+        clean = {k: v for k, v in metadata.items() if not k.startswith("_")}
+        path.write_text(json.dumps(clean, indent=2, default=str), encoding="utf-8")
         return path
+
+    def load_metadata(self, scan_id: str) -> Optional[dict]:
+        """Load scan metadata from disk."""
+        scan_dir = self._base / scan_id
+        meta_path = scan_dir / "metadata.json"
+        if meta_path.is_file():
+            try:
+                return json.loads(meta_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                return None
+        return None
+
+    def save_device_snapshot(self, scan_id: str, device_data: dict) -> Path:
+        """Persist device metadata snapshot at examination start time."""
+        scan_dir = self._base / scan_id
+        scan_dir.mkdir(parents=True, exist_ok=True)
+        path = scan_dir / "device.json"
+        path.write_text(json.dumps(device_data, indent=2, default=str), encoding="utf-8")
+        return path
+
+    def save_timeline(self, scan_id: str, timeline: list[dict]) -> Path:
+        """Persist structured activity timeline."""
+        scan_dir = self._base / scan_id
+        scan_dir.mkdir(parents=True, exist_ok=True)
+        path = scan_dir / "timeline.json"
+        path.write_text(json.dumps(timeline, indent=2, default=str), encoding="utf-8")
+        return path
+
+    def load_timeline(self, scan_id: str) -> list[dict]:
+        """Load activity timeline from disk."""
+        scan_dir = self._base / scan_id
+        path = scan_dir / "timeline.json"
+        if path.is_file():
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                return []
+        return []
+
+    # ── Log persistence ───────────────────────────────────────────────
 
     def save_command_log(self, scan_id: str, content: str) -> Path:
         """Save the command execution log."""
-        path = self._base / scan_id / "command_log.txt"
+        path = self._base / scan_id / "logs" / "commands.log"
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
+        # Also save to legacy location for backward compatibility
+        legacy = self._base / scan_id / "command_log.txt"
+        legacy.write_text(content, encoding="utf-8")
         return path
 
     def save_stdout(self, scan_id: str, content: str) -> Path:
-        path = self._base / scan_id / "stdout.log"
+        path = self._base / scan_id / "logs" / "stdout.log"
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
+        # Also save to legacy location
+        legacy = self._base / scan_id / "stdout.log"
+        legacy.write_text(content, encoding="utf-8")
         return path
 
     def save_stderr(self, scan_id: str, content: str) -> Path:
-        path = self._base / scan_id / "stderr.log"
+        path = self._base / scan_id / "logs" / "stderr.log"
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         return path
+
+    def save_examination_log(self, scan_id: str, content: str) -> Path:
+        """Save the human-readable examination log."""
+        path = self._base / scan_id / "logs" / "examination.log"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        return path
+
+    # ── Hashing & Manifests ───────────────────────────────────────────
 
     def compute_hashes(self, scan_id: str) -> list[dict]:
         """Calculate SHA-256 hashes for all files in the scan directory."""
@@ -107,8 +169,26 @@ class EvidenceService:
         log.info("Manifest generated: %s", manifest_path)
         return manifest
 
+    # ── Report path helpers ───────────────────────────────────────────
+
+    def get_report_path(self, scan_id: str) -> Optional[Path]:
+        """Return the report PDF path if it exists."""
+        scan_dir = self._base / scan_id
+        if not scan_dir:
+            return None
+        # Check new location first, then legacy
+        new_path = scan_dir / "report" / "report.pdf"
+        if new_path.is_file():
+            return new_path
+        legacy = scan_dir / "report.pdf"
+        if legacy.is_file():
+            return legacy
+        return None
+
+    # ── Listing ───────────────────────────────────────────────────────
+
     def list_scans(self) -> list[dict]:
-        """List all scan directories with basic info."""
+        """List all scan directories with enriched info from metadata."""
         if not self._base.is_dir():
             return []
         scans = []
@@ -121,11 +201,17 @@ class EvidenceService:
                         meta = json.loads(meta_path.read_text(encoding="utf-8"))
                     except (json.JSONDecodeError, OSError):
                         pass
+                device = meta.get("device", {})
                 scans.append({
                     "scan_id": d.name,
                     "has_manifest": (d / "manifest.json").is_file(),
-                    "has_report": (d / "report.pdf").is_file(),
+                    "has_report": (d / "report" / "report.pdf").is_file() or (d / "report.pdf").is_file(),
                     "status": meta.get("status", "unknown"),
                     "device_serial": meta.get("device_serial", ""),
+                    "device_model": device.get("model"),
+                    "device_manufacturer": device.get("manufacturer"),
+                    "started_at": meta.get("started_at"),
+                    "completed_at": meta.get("completed_at"),
+                    "findings_count": meta.get("findings_count", 0),
                 })
         return scans

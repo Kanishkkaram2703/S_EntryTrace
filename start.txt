@@ -1,0 +1,267 @@
+================================================================================
+                     S*EntryTrace Forensic Workstation
+                    STEP-BY-STEP APPLICATION STARTUP GUIDE
+================================================================================
+
+This document provides clear, step-by-step instructions to launch and run the
+S*EntryTrace Android Digital Forensics Workstation on Windows.
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1. System Prerequisites & Environment Verification
+2. Step 1: Start the Python FastAPI Backend (Terminal 1)
+3. Step 2: Start the React + Vite Frontend (Terminal 2)
+4. Step 3: Connect & Authorize an Android Device
+5. Step 4: Access the Forensic Workstation in Your Browser
+6. Step 5: How to Run a Forensic Scan & Generate Reports
+7. Running Automated Tests & Diagnostics
+8. Common Troubleshooting & Solutions
+
+================================================================================
+1. SYSTEM PREREQUISITES & ENVIRONMENT VERIFICATION
+================================================================================
+
+All necessary environments and binaries are already set up within the project:
+  - Python Environment: `d:\E_Drive\S_EntryTrace\.venv` (Python 3.11.9)
+  - MVT Engine: Mobile Verification Toolkit 2.0.0 (Installed in .venv)
+  - ADB Platform Tools: `d:\E_Drive\S_EntryTrace\platform-tools\adb.exe` (v1.0.41)
+  - Node.js & npm: Node v20+ (Installed on system)
+  - Frontend Dependencies: `d:\E_Drive\S_EntryTrace\frontend\node_modules` (Installed)
+
+Quick Pre-flight Check (Open PowerShell in project root):
+  PS d:\E_Drive\S_EntryTrace> .\.venv\Scripts\python --version
+  # Expected: Python 3.11.9
+
+  PS d:\E_Drive\S_EntryTrace> .\.venv\Scripts\mvt-android version
+  # Expected: MVT - Mobile Verification Toolkit Version: 2.0.0
+
+  PS d:\E_Drive\S_EntryTrace> .\platform-tools\adb.exe version
+  # Expected: Android Debug Bridge version 1.0.41 (Version 37.0.1-...)
+
+
+================================================================================
+2. STEP 1: START THE PYTHON FASTAPI BACKEND (TERMINAL 1)
+================================================================================
+
+Open your first terminal window (PowerShell or Command Prompt):
+
+1. Navigate to the project root directory:
+   cd d:\E_Drive\S_EntryTrace
+
+2. Activate the Python virtual environment:
+   In PowerShell:
+     .\.venv\Scripts\Activate.ps1
+     (Note: If PowerShell complains about script execution policy, run:
+      Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass)
+   In Command Prompt (CMD):
+     .\.venv\Scripts\activate.bat
+
+3. Start the FastAPI backend server:
+   python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
+
+   You will see output similar to:
+   ---------------------------------------------------------------------
+   INFO:     Will watch for changes in: ['d:\\E_Drive\\S_EntryTrace']
+   INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+   INFO:     Started reloader process [...]
+   INFO:     Started server process [...]
+   INFO:     Waiting for application startup.
+   INFO:     Application startup complete.
+   ---------------------------------------------------------------------
+
+4. Verify Backend Health (in a browser or curl):
+   Open: http://127.0.0.1:8000/health
+   Expected response:
+   {
+     "app_name": "S*EntryTrace Forensic Workstation",
+     "app_version": "0.1.0",
+     "environment": "development",
+     "status": "ok",
+     "mvt": { "available": true, "version": "2.0.0", "module_count": 28 },
+     "adb": { "available": true, "version": "1.0.41" }
+   }
+
+   Interactive API Documentation (Swagger UI):
+   Open: http://127.0.0.1:8000/docs
+
+* KEEP THIS TERMINAL RUNNING! *
+
+
+================================================================================
+3. STEP 2: START THE REACT + VITE FRONTEND (TERMINAL 2)
+================================================================================
+
+Open a second terminal window (PowerShell or Command Prompt):
+
+1. Navigate to the frontend directory:
+   cd d:\E_Drive\S_EntryTrace\frontend
+
+2. Start the Vite development server:
+   npm run dev
+
+   You will see output similar to:
+   ---------------------------------------------------------------------
+     VITE v8.3.0  ready in 250 ms
+
+     ➜  Local:   http://localhost:5173/
+     ➜  Network: use --host to expose
+     ➜  press h + enter to show help
+   ---------------------------------------------------------------------
+
+* KEEP THIS TERMINAL RUNNING! *
+
+
+================================================================================
+4. STEP 3: CONNECT & AUTHORIZE AN ANDROID DEVICE
+================================================================================
+
+To analyze a physical Android smartphone:
+
+1. Enable Developer Options on the device:
+   - Go to: Settings -> About Phone
+   - Tap "Build Number" 7 times until you see "You are now a developer!"
+
+2. Enable USB Debugging:
+   - Go to: Settings -> System (or Additional Settings) -> Developer Options
+   - Toggle "USB Debugging" to ON.
+
+3. Connect the device via USB cable to this computer.
+   - When the phone prompts with "Allow USB debugging?":
+     -> Check the box "Always allow from this computer"
+     -> Tap "Allow"
+
+4. Verify Device Authorization:
+   In project root, run:
+   .\platform-tools\adb.exe devices
+
+   Expected output:
+   List of devices attached
+   10BF7P1KXY005QD    device
+
+   * If it says "unauthorized", check your phone screen to accept the prompt.
+   * If it says "offline", unplug and replug the USB cable.
+
+
+================================================================================
+5. STEP 4: ACCESS THE FORENSIC WORKSTATION IN YOUR BROWSER
+================================================================================
+
+1. Open your web browser (Chrome, Edge, Brave, Firefox).
+2. Navigate to:
+   http://localhost:5173
+
+3. The S*EntryTrace Workstation dashboard will load with 6 main tabs:
+   - Overview (Dashboard): Live status cards, active device summary, findings stats.
+   - Device Profile: Real-time hardware specs, Android version, build fingerprint.
+   - Scan Control: 7-stage live triage scan execution and progress monitor.
+   - Findings Examination: Detailed anomaly breakdown with plain-English context.
+   - Evidence Files: File catalog, extraction logs, and cryptographic SHA-256 hashes.
+   - PDF Report: Generate, preview, and download court-ready forensic reports.
+
+
+================================================================================
+6. STEP 5: HOW TO RUN A FORENSIC SCAN & GENERATE REPORTS
+================================================================================
+
+1. In the Web UI, click on the "Scan Control" tab in the top navigation.
+2. Select your connected device from the dropdown.
+3. Select profile: "Rapid Triage" (standard forensic triage).
+4. Click the "Start Triage Scan" button.
+5. The 7 sequential forensic stages will execute with real-time indicators:
+   [1] Device Pre-Flight Check
+   [2] Device Metadata Collection (Model, OS, SDK, Security Patch)
+   [3] Bugreport Collection (Full system diagnostic dump via ADB)
+   [4] MVT Forensic Engine Analysis (28 specialized Android modules)
+   [5] Device Properties Extraction (System properties, getprop)
+   [6] Cryptographic Evidence Hashing (SHA-256 integrity verification)
+   [7] Threat Intelligence & IOC Matching (STIX2 indicator matching)
+
+6. Review Examination Results:
+   - Navigate to the "Findings Examination" tab to inspect all flagged items:
+     * Accessibility Service misuse (e.g. keyloggers or overlays)
+     * Suspicious permission grants on system packages
+     * App installations/uninstalls
+     * Mount point anomalies
+   - Expand each finding to read:
+     * What was detected
+     * Why it matters
+     * Forensic interpretation & recommended action
+
+7. Export Official Forensic PDF Report:
+   - Go to the "PDF Report" tab.
+   - Click "Generate Forensic PDF".
+   - Download the generated report. It contains a complete 10-section breakdown,
+     chain-of-custody evidence hashes, device metadata, and risk summary.
+
+
+================================================================================
+7. RUNNING AUTOMATED TESTS & DIAGNOSTICS
+================================================================================
+
+To verify backend integrity and all services at any time:
+
+1. In the project root (`d:\E_Drive\S_EntryTrace`), run:
+   .\.venv\Scripts\pytest backend/tests/
+
+   Result: All 34 tests should pass (34 passed in ~20-25s):
+     - test_adb_client.py: 10 tests passed
+     - test_device_manager.py: 10 tests passed
+     - test_evidence_service.py: 4 tests passed
+     - test_health.py: 3 tests passed
+     - test_mvt_engine.py: 6 tests passed
+     - test_scan_service.py: 1 test passed
+
+2. To verify the frontend build:
+   cd d:\E_Drive\S_EntryTrace\frontend
+   npm run build
+   # Expected: Clean compilation with 0 errors.
+
+
+================================================================================
+8. COMMON TROUBLESHOOTING & SOLUTIONS
+================================================================================
+
+Q1: PowerShell says "running scripts is disabled on this system".
+Solution:
+  Run this command in PowerShell before activating:
+  Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+Q2: Backend fails to start with "Address already in use: 8000".
+Solution:
+  Another process is using port 8000. Find and terminate it:
+  Get-Process -Id (Get-NetTCPConnection -LocalPort 8000).OwningProcess | Stop-Process -Force
+  Or start on an alternative port:
+  python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8001 --reload
+
+Q3: Frontend fails to connect to backend (Network Error / Failed to fetch).
+Solution:
+  - Make sure Terminal 1 (Uvicorn backend) is running on port 8000.
+  - Test `http://127.0.0.1:8000/health` in your browser.
+  - Vite automatically proxies `/api`, `/health`, and `/docs` to `http://127.0.0.1:8000`.
+
+Q4: ADB does not detect the phone (`adb devices` is empty).
+Solution:
+  - Ensure the USB cable supports data transfer (not charge-only).
+  - On the phone, toggle USB connection from "Charge only" to "File Transfer / MTP".
+  - Toggle USB Debugging OFF and ON again in Developer Options.
+  - Restart the ADB server:
+    .\platform-tools\adb.exe kill-server
+    .\platform-tools\adb.exe start-server
+    .\platform-tools\adb.exe devices
+
+Q5: Device status shows "unauthorized".
+Solution:
+  - Unlock the phone screen.
+  - Look for the dialog asking to "Allow USB debugging?".
+  - Check "Always allow from this computer" and tap "OK / Allow".
+
+Q6: Bugreport takes several minutes.
+Solution:
+  - This is normal. Android bugreports are comprehensive system diagnostics
+    often exceeding 20-50 MB. S*EntryTrace has a 600-second (10-minute) timeout
+    to allow complete capture on all devices.
+
+================================================================================
+                          END OF STARTUP GUIDE
+================================================================================
