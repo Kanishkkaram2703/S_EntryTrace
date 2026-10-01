@@ -1,0 +1,59 @@
+# S*EntryTrace — Python Dependencies
+# Generated from working development environment (Python 3.11)
+# MVT is installed separately from local source in Dockerfile
+
+fastapi==0.141.1
+uvicorn==0.53.0
+pydantic==2.13.4
+pydantic-settings==2.15.0
+pydantic_core==2.46.4
+python-dotenv==1.2.3
+python-dateutil==2.9.0.post0
+fpdf2==2.8.8
+pillow==12.3.0
+requests==2.34.2
+PyYAML==6.0.3
+click==8.4.2
+colorama==0.4.6
+rich==15.0.0
+cryptography==50.0.0
+simplejson==4.1.1
+defusedxml==0.7.1
+starlette==1.6.0
+anyio==4.15.1
+httpx==0.28.1
+typing_extensions==4.16.0
+typing-inspection==0.4.4
+annotated-types==0.8.0
+
+# MVT transitive dependencies
+adb_shell==0.4.4
+appdirs==1.4.4
+betterproto2==0.10.0
+certifi==2026.7.22
+cffi==2.1.1
+charset-normalizer==3.5.1
+h11==0.16.0
+httpcore==1.0.9
+idna==3.19
+iphone_backup_decrypt==0.9.0
+libusb1==3.4.0
+markdown-it-py==4.2.0
+mdurl==0.1.2
+NSKeyedUnArchiver==1.5.2
+packaging==26.3
+pyahocorasick==2.3.1
+pyasn1==0.6.4
+pycparser==3.0
+pycryptodome==3.23.0
+Pygments==2.21.0
+rsa==4.9.1
+six==1.17.0
+tld==0.13.2
+urllib3==2.7.0
+
+# Test dependencies
+pytest==9.1.1
+pytest-asyncio==1.4.0
+iniconfig==2.3.0
+pluggy==1.6.0

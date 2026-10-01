@@ -1,0 +1,47 @@
+# ============================================================
+# S*EntryTrace — Docker Compose
+# ============================================================
+#
+# Usage:
+#   docker compose up --build
+#
+# Application will be available at http://localhost:3000
+#
+# ADB/USB NOTE:
+#   USB device passthrough requires the host ADB server.
+#   Start ADB on the host first, then the container connects
+#   to it via network. See README for details.
+# ============================================================
+
+services:
+  sentrytrace:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sentrytrace
+    ports:
+      - "3000:80"
+    volumes:
+      # Persist forensic evidence and reports across container restarts
+      - sentrytrace-evidence:/app/evidence
+      - sentrytrace-reports:/app/reports
+      - sentrytrace-logs:/app/logs
+    environment:
+      - STE_ENVIRONMENT=production
+      - STE_SAFE_MODE=true
+      - STE_ADB_PATH=/usr/bin/adb
+      - STE_EVIDENCE_DIR=/app/evidence
+      - STE_REPORTS_DIR=/app/reports
+      - STE_LOG_DIR=/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  sentrytrace-evidence:
+  sentrytrace-reports:
+  sentrytrace-logs:

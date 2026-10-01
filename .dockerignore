@@ -1,0 +1,60 @@
+# ============================================================
+# S*EntryTrace — .dockerignore
+# ============================================================
+
+# Git
+.git
+.github
+.gitignore
+
+# Python caches
+__pycache__
+*.py[cod]
+*$py.class
+*.egg-info
+.pytest_cache
+
+# Virtual environment (rebuilt in container)
+.venv
+venv
+env
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS junk
+Thumbs.db
+.DS_Store
+
+# Node (rebuilt in container)
+frontend/node_modules
+frontend/dist
+
+# Windows platform-tools (Linux ADB installed in container)
+platform-tools
+
+# Evidence & reports (mounted as volumes, not baked into image)
+evidence
+reports
+logs
+
+# Original MVT zip (source already extracted)
+mvt-main.zip
+
+# Build artifacts
+dist
+build
+htmlcov
+.coverage
+*.log
+
+# Environment files (secrets)
+.env
+.env.local
+
+# Agents/IDE metadata
+.agents
